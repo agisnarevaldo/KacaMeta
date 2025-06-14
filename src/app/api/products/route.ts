@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { prisma } from '@/lib/prisma'
 import { $Enums } from '@/generated/prisma'
+import { uploadImage } from '@/lib/server-utils'
 
 type ProductStatus = $Enums.ProductStatus
 
@@ -13,6 +14,7 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category')
     const search = searchParams.get('search')
     const status = searchParams.get('status')
+    const slug = searchParams.get('slug')
     const includeDiscontinued = searchParams.get('includeDiscontinued') === 'true'
 
     const where: any = {}
@@ -28,6 +30,10 @@ export async function GET(request: NextRequest) {
         { name: { contains: search } },
         { description: { contains: search } }
       ]
+    }
+
+    if (slug) {
+      where.slug = slug
     }
 
     if (status) {
@@ -99,6 +105,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Handle image upload
+    let imageUrl = null
+    if (images && images.length > 0) {
+      imageUrl = await uploadImage(images[0])
+    }
+
     const product = await prisma.product.create({
       data: {
         name,
@@ -109,7 +121,7 @@ export async function POST(request: NextRequest) {
         categoryId: parseInt(categoryId),
         badge,
         status: status as ProductStatus || 'AVAILABLE',
-        images: images || null
+        images: imageUrl ? imageUrl : null
       },
       include: {
         category: true
@@ -121,6 +133,68 @@ export async function POST(request: NextRequest) {
     console.error('Error creating product:', error)
     return NextResponse.json(
       { error: 'Failed to create product' },
+      { status: 500 }
+    )
+  }
+}
+
+// PUT /api/products - Update existing product (Admin only)
+export async function PUT(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session || !session.user?.role) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    const body = await request.json()
+    const { id, name, description, price, stock, categoryId, badge, status, images } = body
+
+    // Validate required fields
+    if (!id || !name || !price || !categoryId) {
+      return NextResponse.json(
+        { error: 'ID, name, price, and category are required' },
+        { status: 400 }
+      )
+    }
+
+    // Generate slug from name
+    const slug = name.toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+
+    // Handle image upload
+    let imageUrl = null
+    if (images && images.length > 0) {
+      imageUrl = await uploadImage(images[0])
+    }
+
+    const product = await prisma.product.update({
+      where: { id },
+      data: {
+        name,
+        slug,
+        description,
+        price: parseFloat(price),
+        stock: parseInt(stock) || 0,
+        categoryId: parseInt(categoryId),
+        badge,
+        status: status as ProductStatus || 'AVAILABLE',
+        images: imageUrl ? imageUrl : null
+      },
+      include: {
+        category: true
+      }
+    })
+
+    return NextResponse.json({ product })
+  } catch (error) {
+    console.error('Error updating product:', error)
+    return NextResponse.json(
+      { error: 'Failed to update product' },
       { status: 500 }
     )
   }

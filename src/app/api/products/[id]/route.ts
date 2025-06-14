@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { prisma } from '@/lib/prisma'
 import { $Enums } from '@/generated/prisma'
+import { uploadImage } from '@/lib/server-utils'
 
 type ProductStatus = $Enums.ProductStatus
 
@@ -103,7 +104,21 @@ export async function PUT(
     if (categoryId !== undefined) updateData.categoryId = parseInt(categoryId)
     if (badge !== undefined) updateData.badge = badge
     if (status !== undefined) updateData.status = status as ProductStatus
-    if (images !== undefined) updateData.images = images
+    
+    // Handle image upload
+    if (images !== undefined) {
+      if (images && images.length > 0 && typeof images[0] === 'string' && images[0].startsWith('data:')) {
+        // New image uploaded - process base64
+        const imageUrl = await uploadImage(images[0])
+        updateData.images = imageUrl
+      } else if (images && images.length > 0) {
+        // Existing image URL
+        updateData.images = images[0]
+      } else {
+        // No image or image removed
+        updateData.images = null
+      }
+    }
 
     const product = await prisma.product.update({
       where: { id: productId },
