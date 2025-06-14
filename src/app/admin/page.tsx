@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
+import Image from "next/image";
 import { AppSidebar } from "@/components/app-sidebar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui/sidebar"
 import { Icon } from "@iconify/react"
 import { toast } from "sonner"
+import { ImageUpload } from "@/components/ui/image-upload"
 
 // Type definitions based on Prisma schema
 interface Category {
@@ -48,6 +50,7 @@ interface Product {
   status: 'AVAILABLE' | 'LOW_STOCK' | 'OUT_OF_STOCK';
   badge?: string;
   images?: string;
+  image?: string | null; // For form handling
   categoryId: number;
   category: Category;
   createdAt: string;
@@ -75,6 +78,38 @@ export default function AdminDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
+  // Helper function to validate image URL
+  const isValidImageUrl = (url: string | null | undefined): url is string => {
+    if (!url || typeof url !== 'string' || url.trim().length === 0) {
+      return false;
+    }
+    try {
+      // Check if it's a valid URL format
+      new URL(url, window.location.origin);
+      return true;
+    } catch {
+      // If not a valid URL, check if it's a valid relative path
+      return url.startsWith('/') || url.startsWith('./') || url.startsWith('../');
+    }
+  };
+
+  // Helper function to get the first image from images field
+  const getFirstImage = (images: string | null | undefined): string | null => {
+    if (!images) return null;
+    
+    try {
+      // Try to parse as JSON array first
+      const parsed = JSON.parse(images);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed[0];
+      }
+      return images; // If not JSON, treat as single image URL
+    } catch {
+      // If JSON parse fails, treat as single image URL
+      return images;
+    }
+  };
+
   // New product form state
   const [newProduct, setNewProduct] = useState({
     name: "",
@@ -83,7 +118,8 @@ export default function AdminDashboard() {
     stock: "",
     categoryId: "",
     status: "AVAILABLE",
-    badge: ""
+    badge: "",
+    image: null as string | null
   });
 
   // Fetch data from API
@@ -133,12 +169,17 @@ export default function AdminDashboard() {
   // Add new product
   const handleAddProduct = async () => {
     try {
+      const productData = {
+        ...newProduct,
+        images: newProduct.image ? [newProduct.image] : []
+      };
+
       const response = await fetch('/api/products', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newProduct),
+        body: JSON.stringify(productData),
       });
 
       if (response.ok) {
@@ -151,7 +192,8 @@ export default function AdminDashboard() {
           stock: "",
           categoryId: "",
           status: "AVAILABLE",
-          badge: ""
+          badge: "",
+          image: null
         });
         setIsAddDialogOpen(false);
         toast.success('Produk berhasil ditambahkan');
@@ -168,7 +210,11 @@ export default function AdminDashboard() {
 
   // Edit product
   const handleEditProduct = (product: Product) => {
-    setEditingProduct(product);
+    const currentImage = getFirstImage(product.images);
+    setEditingProduct({
+      ...product,
+      image: currentImage
+    });
     setIsEditDialogOpen(true);
   };
 
@@ -176,20 +222,23 @@ export default function AdminDashboard() {
     if (!editingProduct) return;
 
     try {
+      const updateData = {
+        name: editingProduct.name,
+        description: editingProduct.description,
+        price: editingProduct.price,
+        stock: editingProduct.stock,
+        categoryId: editingProduct.categoryId,
+        status: editingProduct.status,
+        badge: editingProduct.badge,
+        images: editingProduct.image ? [editingProduct.image] : []
+      };
+
       const response = await fetch(`/api/products/${editingProduct.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: editingProduct.name,
-          description: editingProduct.description,
-          price: editingProduct.price,
-          stock: editingProduct.stock,
-          categoryId: editingProduct.categoryId,
-          status: editingProduct.status,
-          badge: editingProduct.badge
-        }),
+        body: JSON.stringify(updateData),
       });
 
       if (response.ok) {
@@ -350,7 +399,7 @@ export default function AdminDashboard() {
                         Tambah Produk
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[525px]">
+                    <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
                       <DialogHeader>
                         <DialogTitle>Tambah Produk Baru</DialogTitle>
                         <DialogDescription>
@@ -376,6 +425,10 @@ export default function AdminDashboard() {
                             placeholder="Masukkan deskripsi produk"
                           />
                         </div>
+                        <ImageUpload
+                          onImageSelect={(imageBase64) => setNewProduct({...newProduct, image: imageBase64})}
+                          currentImage={newProduct.image}
+                        />
                         <div className="grid grid-cols-2 gap-4">
                           <div className="grid gap-2">
                             <Label htmlFor="price">Harga</Label>
@@ -525,6 +578,7 @@ export default function AdminDashboard() {
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          <TableHead>Gambar</TableHead>
                           <TableHead>Nama Produk</TableHead>
                           <TableHead>Kategori</TableHead>
                           <TableHead>Harga</TableHead>
@@ -535,8 +589,28 @@ export default function AdminDashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredProducts.map((product) => (
+                        {filteredProducts.map((product) => {
+                          const firstImage = getFirstImage(product.images);
+                          return (
                           <TableRow key={product.id}>
+                            <TableCell>
+                              {isValidImageUrl(firstImage) ? (
+                                <Image 
+                                  src={firstImage} 
+                                  alt={product.name}
+                                  width={64}
+                                  height={64}
+                                  className="w-16 h-16 object-cover rounded-lg border"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                  }}
+                                />
+                              ) : null}
+                              <div className={`w-16 h-16 bg-gray-100 rounded-lg border flex items-center justify-center ${isValidImageUrl(firstImage) ? 'hidden' : ''}`}>
+                                <Icon icon="ph:image-bold" className="h-6 w-6 text-gray-400" />
+                              </div>
+                            </TableCell>
                             <TableCell className="font-medium">{product.name}</TableCell>
                             <TableCell>{product.category.name}</TableCell>
                             <TableCell>Rp {product.price.toLocaleString('id-ID')}</TableCell>
@@ -571,7 +645,7 @@ export default function AdminDashboard() {
                               </div>
                             </TableCell>
                           </TableRow>
-                        ))}
+                        )})}
                       </TableBody>
                     </Table>
                   </CardContent>
@@ -585,7 +659,7 @@ export default function AdminDashboard() {
 
       {/* Edit Product Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[525px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Produk</DialogTitle>
             <DialogDescription>
@@ -612,6 +686,10 @@ export default function AdminDashboard() {
                   placeholder="Masukkan deskripsi produk"
                 />
               </div>
+              <ImageUpload
+                onImageSelect={(imageBase64) => setEditingProduct({...editingProduct, image: imageBase64})}
+                currentImage={editingProduct.image}
+              />
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="edit-price">Harga</Label>
