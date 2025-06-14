@@ -189,7 +189,7 @@ async function main() {
     }
   });
 
-  console.log("✅ Admin users created");
+  console.log(`✅ Admin users created: ${admin.username}, ${admin2.username}`);
 
   // Create Sample Customers
   const customers = await Promise.all([
