@@ -1,9 +1,10 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Icon } from "@iconify/react";
 import { useState, useEffect } from "react";
@@ -30,10 +31,43 @@ interface Product {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [activeCategory, setActiveCategory] = useState("semua");
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Helper function to get the first image from images field
+  const getFirstImage = (images: string | null | undefined): string | null => {
+    if (!images) return null;
+    
+    try {
+      // Try to parse as JSON array first
+      const parsed = JSON.parse(images);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed[0];
+      }
+      return images; // If not JSON, treat as single image URL
+    } catch {
+      // If JSON parse fails, treat as single image URL
+      return images;
+    }
+  };
+
+  // Helper function to validate image URL
+  const isValidImageUrl = (url: string | null | undefined): url is string => {
+    if (!url || typeof url !== 'string' || url.trim().length === 0) {
+      return false;
+    }
+    try {
+      // Check if it's a valid URL format
+      new URL(url, window.location.origin);
+      return true;
+    } catch {
+      // If not a valid URL, check if it's a valid relative path
+      return url.startsWith('/') || url.startsWith('./') || url.startsWith('../');
+    }
+  };
 
   // Fetch data from API
   useEffect(() => {
@@ -180,11 +214,29 @@ export default function Home() {
 
           {/* Grid Produk */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredProducts.map((product) => (
-              <Card key={product.id} className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-2">
+            {filteredProducts.map((product) => {
+              const firstImage = getFirstImage(product.images);
+              return (
+              <Card 
+                key={product.id} 
+                className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-2 cursor-pointer"
+                onClick={() => router.push(`/product/${product.slug}`)}
+              >
                 <CardHeader className="p-0">
                   <div className="relative aspect-[4/3] overflow-hidden rounded-t-lg">
-                    <div className="w-full h-full bg-gradient-to-br from-blue-100 to-slate-200 flex items-center justify-center">
+                    {isValidImageUrl(firstImage) ? (
+                      <Image 
+                        src={firstImage} 
+                        alt={product.name}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                        }}
+                      />
+                    ) : null}
+                    <div className={`w-full h-full bg-gradient-to-br from-blue-100 to-slate-200 flex items-center justify-center ${isValidImageUrl(firstImage) ? 'hidden' : ''}`}>
                       <Icon icon="ph:glasses-bold" className="h-20 w-20 text-blue-400" />
                     </div>
                     {product.badge && (
@@ -195,24 +247,38 @@ export default function Home() {
                   </div>
                 </CardHeader>
                 <CardContent className="p-6">
-                  <CardTitle className="text-xl mb-2 text-slate-900">
+                  <CardTitle className="text-xl mb-2 text-slate-900 group-hover:text-blue-600 transition-colors">
                     {product.name}
                   </CardTitle>
                   <p className="text-2xl font-bold text-blue-600">
                     Rp {product.price.toLocaleString('id-ID')}
                   </p>
                 </CardContent>
-                <CardFooter className="p-6 pt-0">
+                <CardFooter className="p-6 pt-0 flex gap-2">
                   <Button 
-                    className="w-full bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => sendWhatsApp(product.name)}
+                    variant="outline"
+                    className="flex-1 border-blue-600 text-blue-600 hover:bg-blue-50"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/product/${product.slug}`);
+                    }}
+                  >
+                    <Icon icon="ph:eye-bold" className="mr-2 h-4 w-4" />
+                    Detail
+                  </Button>
+                  <Button 
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      sendWhatsApp(product.name);
+                    }}
                   >
                     <Icon icon="ic:baseline-whatsapp" className="mr-2 h-4 w-4" />
-                    Pesan via WhatsApp
+                    Pesan
                   </Button>
                 </CardFooter>
               </Card>
-            ))}
+            )})}
           </div>
         </div>
       </section>
