@@ -6,65 +6,67 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Icon } from "@iconify/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
-// Data produk placeholder
-const products = [
-  {
-    id: 1,
-    name: "Kacamata Classic Retro",
-    price: "Rp 299.000",
-    category: "pria",
-    image: "/api/placeholder/300/200",
-    badge: "Best Seller"
-  },
-  {
-    id: 2,
-    name: "Sunglasses Premium Lady",
-    price: "Rp 450.000",
-    category: "wanita",
-    image: "/api/placeholder/300/200",
-    badge: "New"
-  },
-  {
-    id: 3,
-    name: "Anti Radiasi Blue Light",
-    price: "Rp 350.000",
-    category: "anti-radiasi",
-    image: "/api/placeholder/300/200",
-    badge: "Popular"
-  },
-  {
-    id: 4,
-    name: "Kids Fun Glasses",
-    price: "Rp 180.000",
-    category: "anak",
-    image: "/api/placeholder/300/200",
-    badge: ""
-  },
-  {
-    id: 5,
-    name: "Executive Men Style",
-    price: "Rp 520.000",
-    category: "pria",
-    image: "/api/placeholder/300/200",
-    badge: "Premium"
-  },
-  {
-    id: 6,
-    name: "Elegant Women Frame",
-    price: "Rp 420.000",
-    category: "wanita",
-    image: "/api/placeholder/300/200",
-    badge: ""
-  }
-];
+// Type definitions based on Prisma schema
+interface Category {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+}
+
+interface Product {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  price: number;
+  stock: number;
+  status: 'AVAILABLE' | 'LOW_STOCK' | 'OUT_OF_STOCK' | 'DISCONTINUED';
+  badge?: string;
+  images?: string;
+  category: Category;
+}
 
 export default function Home() {
   const [activeCategory, setActiveCategory] = useState("semua");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch data from API
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [productsRes, categoriesRes] = await Promise.all([
+        fetch('/api/products'),
+        fetch('/api/categories')
+      ]);
+
+      if (productsRes.ok) {
+        const productsData = await productsRes.json();
+        setProducts(productsData.products);
+      }
+
+      if (categoriesRes.ok) {
+        const categoriesData = await categoriesRes.json();
+        setCategories(categoriesData.categories);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredProducts = products.filter(product => 
-    activeCategory === "semua" || product.category === activeCategory
+    (activeCategory === "semua" || product.category.slug === activeCategory) &&
+    product.status !== 'DISCONTINUED' // Hide discontinued products from customers
   );
 
   const whatsappNumber = "6281234567890"; // Ganti dengan nomor WhatsApp yang benar
@@ -77,6 +79,17 @@ export default function Home() {
     const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <Icon icon="ph:glasses-bold" className="h-16 w-16 text-blue-600 mx-auto mb-4 animate-pulse" />
+          <p className="text-lg text-slate-600">Memuat katalog...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
@@ -91,6 +104,7 @@ export default function Home() {
             <div className="hidden md:flex items-center space-x-8">
               <a href="#beranda" className="text-slate-700 hover:text-blue-600 transition-colors">Beranda</a>
               <a href="#katalog" className="text-slate-700 hover:text-blue-600 transition-colors">Katalog</a>
+              <a href="/admin" className="text-slate-700 hover:text-blue-600 transition-colors">Admin</a>
               <Button 
                 onClick={() => sendWhatsApp()} 
                 variant="outline" 
@@ -153,12 +167,13 @@ export default function Home() {
           {/* Filter Kategori */}
           <div className="mb-12">
             <Tabs value={activeCategory} onValueChange={setActiveCategory} className="w-full">
-              <TabsList className="grid w-full grid-cols-5 max-w-2xl mx-auto">
+              <TabsList className="grid w-full max-w-2xl mx-auto" style={{ gridTemplateColumns: `repeat(${categories.length + 1}, 1fr)` }}>
                 <TabsTrigger value="semua">Semua</TabsTrigger>
-                <TabsTrigger value="pria">Pria</TabsTrigger>
-                <TabsTrigger value="wanita">Wanita</TabsTrigger>
-                <TabsTrigger value="anak">Anak</TabsTrigger>
-                <TabsTrigger value="anti-radiasi">Anti Radiasi</TabsTrigger>
+                {categories.map(category => (
+                  <TabsTrigger key={category.id} value={category.slug}>
+                    {category.name}
+                  </TabsTrigger>
+                ))}
               </TabsList>
             </Tabs>
           </div>
@@ -184,7 +199,7 @@ export default function Home() {
                     {product.name}
                   </CardTitle>
                   <p className="text-2xl font-bold text-blue-600">
-                    {product.price}
+                    Rp {product.price.toLocaleString('id-ID')}
                   </p>
                 </CardContent>
                 <CardFooter className="p-6 pt-0">
