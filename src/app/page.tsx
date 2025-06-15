@@ -118,7 +118,7 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center">
         <div className="text-center">
-          <Icon icon="ph:glasses-bold" className="h-16 w-16 text-blue-600 mx-auto mb-4 animate-pulse" />
+          <Icon icon="mdi:glasses" className="h-16 w-16 text-blue-600 mx-auto mb-4 animate-pulse" />
           <p className="text-lg text-slate-600">Memuat katalog...</p>
         </div>
       </div>
@@ -132,7 +132,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-2">
-              <Icon icon="ph:glasses-bold" className="h-8 w-8 text-blue-600" />
+              <Icon icon="mdi:glasses" className="h-8 w-8 text-blue-600" />
               <span className="text-2xl font-bold text-slate-900">KacaMeta</span>
             </div>
             <div className="hidden md:flex items-center space-x-8">
