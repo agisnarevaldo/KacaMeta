@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card"
 import { Icon } from "@iconify/react"
 
 export default function AdminLoginPage() {
@@ -50,19 +50,18 @@ export default function AdminLoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
+          <div className="flex justify-center">
             <div className="flex items-center space-x-2">
-              <Icon icon="ph:glasses-bold" className="h-8 w-8 text-blue-600" />
-              <span className="text-2xl font-bold text-slate-900">KacaMeta</span>
+              <Icon icon="mdi:glasses" width="24" height="24" className="h-8 w-8 text-blue-600" />
+              <span className="text-2xl font-bold">KacaMeta</span>
             </div>
           </div>
-          <CardTitle className="text-2xl">Login Admin</CardTitle>
-          <CardDescription>
+          <CardDescription  className="text-sm text-gray-600">
             Masuk ke dashboard admin KacaMeta
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 mb-4">
             {error && (
               <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
                 {error}
@@ -111,11 +110,6 @@ export default function AdminLoginPage() {
                 </>
               )}
             </Button>
-            <div className="text-center text-sm text-slate-500">
-              <p>Demo Login:</p>
-              <p>Email: admin@kacameta.com | Password: admin123</p>
-              <p>Email: staff@kacameta.com | Password: staff123</p>
-            </div>
             <Button 
               type="button" 
               variant="outline" 
