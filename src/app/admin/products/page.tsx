@@ -1,0 +1,698 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import Image from "next/image";
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { SidebarTrigger } from "@/components/ui/sidebar"
+import { Icon } from "@iconify/react"
+import { toast } from "sonner"
+import { ImageUpload } from "@/components/ui/image-upload"
+
+// Type definitions based on Prisma schema
+interface Category {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  _count?: {
+    products: number;
+  };
+}
+
+interface Product {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  price: number;
+  stock: number;
+  status: 'AVAILABLE' | 'LOW_STOCK' | 'OUT_OF_STOCK' | 'DISCONTINUED';
+  badge?: string;
+  images?: string;
+  image?: string | null; // For form handling
+  categoryId: number;
+  category: Category;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export default function ProductManagement() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  // Helper function to validate image URL
+  const isValidImageUrl = (url: string | null | undefined): url is string => {
+    if (!url || typeof url !== 'string' || url.trim().length === 0) {
+      return false;
+    }
+    try {
+      new URL(url, window.location.origin);
+      return true;
+    } catch {
+      return url.startsWith('/') || url.startsWith('./') || url.startsWith('../');
+    }
+  };
+
+  // Helper function to get the first image from images field
+  const getFirstImage = (images: string | null | undefined): string | null => {
+    if (!images) return null;
+    
+    try {
+      const parsed = JSON.parse(images);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed[0];
+      }
+      return images;
+    } catch {
+      return images;
+    }
+  };
+
+  // New product form state
+  const [newProduct, setNewProduct] = useState({
+    name: "",
+    description: "",
+    price: "",
+    stock: "",
+    categoryId: "",
+    status: "AVAILABLE",
+    badge: "",
+    image: null as string | null
+  });
+
+  // Fetch data from API
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [productsRes, categoriesRes] = await Promise.all([
+        fetch('/api/products?includeDiscontinued=true'),
+        fetch('/api/categories')
+      ]);
+
+      if (productsRes.ok) {
+        const productsData = await productsRes.json();
+        setProducts(productsData.products);
+      }
+
+      if (categoriesRes.ok) {
+        const categoriesData = await categoriesRes.json();
+        setCategories(categoriesData.categories);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      toast.error('Gagal memuat data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Filter products based on search, category, and status
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesCategory = categoryFilter === "all" || product.category.slug === categoryFilter;
+    const matchesStatus = statusFilter === "all" || product.status === statusFilter;
+    return matchesSearch && matchesCategory && matchesStatus;
+  });
+
+  // Add new product
+  const handleAddProduct = async () => {
+    try {
+      const productData = {
+        ...newProduct,
+        images: newProduct.image ? [newProduct.image] : []
+      };
+
+      const response = await fetch('/api/products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(productData),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setProducts([data.product, ...products]);
+        setNewProduct({
+          name: "",
+          description: "",
+          price: "",
+          stock: "",
+          categoryId: "",
+          status: "AVAILABLE",
+          badge: "",
+          image: null
+        });
+        setIsAddDialogOpen(false);
+        toast.success('Produk berhasil ditambahkan');
+        fetchData();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Gagal menambahkan produk');
+      }
+    } catch (error) {
+      console.error('Error adding product:', error);
+      toast.error('Gagal menambahkan produk');
+    }
+  };
+
+  // Edit product
+  const handleEditProduct = (product: Product) => {
+    const currentImage = getFirstImage(product.images);
+    setEditingProduct({
+      ...product,
+      image: currentImage
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateProduct = async () => {
+    if (!editingProduct) return;
+
+    try {
+      const updateData = {
+        name: editingProduct.name,
+        description: editingProduct.description,
+        price: editingProduct.price,
+        stock: editingProduct.stock,
+        categoryId: editingProduct.categoryId,
+        status: editingProduct.status,
+        badge: editingProduct.badge,
+        images: editingProduct.image ? [editingProduct.image] : []
+      };
+
+      const response = await fetch(`/api/products/${editingProduct.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setProducts(products.map(p => p.id === editingProduct.id ? data.product : p));
+        setIsEditDialogOpen(false);
+        setEditingProduct(null);
+        toast.success('Produk berhasil diupdate');
+        fetchData();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Gagal mengupdate produk');
+      }
+    } catch (error) {
+      console.error('Error updating product:', error);
+      toast.error('Gagal mengupdate produk');
+    }
+  };
+
+  // Delete product
+  const handleDeleteProduct = async (id: number) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus produk ini? Jika produk pernah dipesan, lebih baik mengubah status menjadi "Discontinued".')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/products/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setProducts(products.filter(p => p.id !== id));
+        toast.success('Produk berhasil dihapus');
+        fetchData();
+      } else {
+        const error = await response.json();
+        if (error.error.includes('has been ordered')) {
+          if (confirm('Produk tidak dapat dihapus karena pernah dipesan. Apakah Anda ingin mengubah status menjadi "Discontinued" saja?')) {
+            handleDiscontinueProduct(id);
+          }
+        } else {
+          toast.error(error.error || 'Gagal menghapus produk');
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      toast.error('Gagal menghapus produk');
+    }
+  };
+
+  // Discontinue product instead of deleting
+  const handleDiscontinueProduct = async (id: number) => {
+    try {
+      const response = await fetch(`/api/products/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: 'DISCONTINUED'
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setProducts(products.map(p => p.id === id ? data.product : p));
+        toast.success('Produk berhasil diubah menjadi discontinued');
+        fetchData();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Gagal mengubah status produk');
+      }
+    } catch (error) {
+      console.error('Error discontinuing product:', error);
+      toast.error('Gagal mengubah status produk');
+    }
+  };
+
+  // Get status badge color
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "AVAILABLE": return "bg-green-500";
+      case "LOW_STOCK": return "bg-yellow-500";
+      case "OUT_OF_STOCK": return "bg-red-500";
+      case "DISCONTINUED": return "bg-gray-500";
+      default: return "bg-gray-500";
+    }
+  };
+
+  // Get status display text
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case "AVAILABLE": return "Tersedia";
+      case "LOW_STOCK": return "Stok Rendah";
+      case "OUT_OF_STOCK": return "Habis";
+      case "DISCONTINUED": return "Discontinued";
+      default: return status;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* Custom Header */}
+      <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
+        <SidebarTrigger className="-ml-1"/>
+        <div className="flex flex-1 items-center gap-2">
+          <Icon icon="ph:package-bold" className="h-5 w-5 text-blue-600" />
+          <span className="font-semibold">Manajemen Produk</span>
+        </div>
+      </header>
+
+      <div className="flex flex-1 flex-col">
+        <div className="@container/main flex flex-1 flex-col gap-2">
+          <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+              
+            {/* Header Section */}
+            <div className="px-4 lg:px-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-3xl font-bold text-slate-900">Manajemen Produk</h1>
+                  <p className="text-slate-600">Kelola semua produk kacamata Anda</p>
+                </div>
+                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-blue-600 hover:bg-blue-700">
+                      <Icon icon="ph:plus-bold" className="mr-2 h-4 w-4" />
+                      Tambah Produk
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Tambah Produk Baru</DialogTitle>
+                      <DialogDescription>
+                        Tambahkan produk kacamata baru ke katalog Anda.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="name">Nama Produk</Label>
+                        <Input
+                          id="name"
+                          value={newProduct.name}
+                          onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
+                          placeholder="Masukkan nama produk"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="description">Deskripsi</Label>
+                        <Input
+                          id="description"
+                          value={newProduct.description}
+                          onChange={(e) => setNewProduct({...newProduct, description: e.target.value})}
+                          placeholder="Masukkan deskripsi produk"
+                        />
+                      </div>
+                      <ImageUpload
+                        onImageSelect={(imageBase64) => setNewProduct({...newProduct, image: imageBase64})}
+                        currentImage={newProduct.image}
+                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                          <Label htmlFor="price">Harga</Label>
+                          <Input
+                            id="price"
+                            type="number"
+                            value={newProduct.price}
+                            onChange={(e) => setNewProduct({...newProduct, price: e.target.value})}
+                            placeholder="0"
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="stock">Stok</Label>
+                          <Input
+                            id="stock"
+                            type="number"
+                            value={newProduct.stock}
+                            onChange={(e) => setNewProduct({...newProduct, stock: e.target.value})}
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="categoryId">Kategori</Label>
+                        <Select value={newProduct.categoryId} onValueChange={(value) => setNewProduct({...newProduct, categoryId: value})}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Pilih kategori" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map(category => (
+                              <SelectItem key={category.id} value={category.id.toString()}>{category.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                          <Label htmlFor="status">Status</Label>
+                          <Select value={newProduct.status} onValueChange={(value) => setNewProduct({...newProduct, status: value})}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Pilih status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="AVAILABLE">Tersedia</SelectItem>
+                              <SelectItem value="LOW_STOCK">Stok Rendah</SelectItem>
+                              <SelectItem value="OUT_OF_STOCK">Habis</SelectItem>
+                              <SelectItem value="DISCONTINUED">Discontinued</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="badge">Badge</Label>
+                          <Input
+                            id="badge"
+                            value={newProduct.badge}
+                            onChange={(e) => setNewProduct({...newProduct, badge: e.target.value})}
+                            placeholder="Optional"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                        Batal
+                      </Button>
+                      <Button onClick={handleAddProduct} disabled={!newProduct.name || !newProduct.price || !newProduct.categoryId}>
+                        Tambah Produk
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </div>
+
+            {/* Product Management */}
+            <div className="px-4 lg:px-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Daftar Produk</CardTitle>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <Input
+                      placeholder="Cari produk..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="max-w-sm"
+                    />
+                    <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                      <SelectTrigger className="max-w-sm">
+                        <SelectValue placeholder="Pilih kategori" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Semua Kategori</SelectItem>
+                        {categories.map(category => (
+                          <SelectItem key={category.id} value={category.slug}>{category.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="max-w-sm">
+                        <SelectValue placeholder="Pilih status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Semua Status</SelectItem>
+                        <SelectItem value="AVAILABLE">Tersedia</SelectItem>
+                        <SelectItem value="LOW_STOCK">Stok Rendah</SelectItem>
+                        <SelectItem value="OUT_OF_STOCK">Habis</SelectItem>
+                        <SelectItem value="DISCONTINUED">Discontinued</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-sm text-muted-foreground mb-4">
+                    Menampilkan {filteredProducts.length} dari {products.length} produk
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Gambar</TableHead>
+                        <TableHead>Nama Produk</TableHead>
+                        <TableHead>Kategori</TableHead>
+                        <TableHead>Harga</TableHead>
+                        <TableHead>Stok</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Badge</TableHead>
+                        <TableHead>Aksi</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredProducts.map((product) => {
+                        const firstImage = getFirstImage(product.images);
+                        return (
+                        <TableRow key={product.id}>
+                          <TableCell>
+                            {isValidImageUrl(firstImage) ? (
+                              <Image 
+                                src={firstImage} 
+                                alt={product.name}
+                                width={64}
+                                height={64}
+                                className="w-16 h-16 object-cover rounded-lg border"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                }}
+                              />
+                            ) : null}
+                            <div className={`w-16 h-16 bg-gray-100 rounded-lg border flex items-center justify-center ${isValidImageUrl(firstImage) ? 'hidden' : ''}`}>
+                              <Icon icon="ph:image-bold" className="h-6 w-6 text-gray-400" />
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-medium">{product.name}</TableCell>
+                          <TableCell>{product.category.name}</TableCell>
+                          <TableCell>Rp {product.price.toLocaleString('id-ID')}</TableCell>
+                          <TableCell>{product.stock}</TableCell>
+                          <TableCell>
+                            <Badge className={getStatusColor(product.status)}>
+                              {getStatusText(product.status)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {product.badge && (
+                              <Badge variant="outline">{product.badge}</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex space-x-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEditProduct(product)}
+                              >
+                                <Icon icon="ph:pencil-bold" className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDeleteProduct(product.id)}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <Icon icon="ph:trash-bold" className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )})}
+                      {filteredProducts.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                            <div className="flex flex-col items-center gap-2">
+                              <Icon icon="ph:package-bold" className="h-12 w-12" />
+                              <p>Tidak ada produk ditemukan</p>
+                              <p className="text-sm">Coba ubah filter atau tambahkan produk baru</p>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      {/* Edit Product Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Produk</DialogTitle>
+            <DialogDescription>
+              Update informasi produk kacamata.
+            </DialogDescription>
+          </DialogHeader>
+          {editingProduct && (
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-name">Nama Produk</Label>
+                <Input
+                  id="edit-name"
+                  value={editingProduct.name}
+                  onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})}
+                  placeholder="Masukkan nama produk"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-description">Deskripsi</Label>
+                <Input
+                  id="edit-description"
+                  value={editingProduct.description || ''}
+                  onChange={(e) => setEditingProduct({...editingProduct, description: e.target.value})}
+                  placeholder="Masukkan deskripsi produk"
+                />
+              </div>
+              <ImageUpload
+                onImageSelect={(imageBase64) => setEditingProduct({...editingProduct, image: imageBase64})}
+                currentImage={editingProduct.image}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-price">Harga</Label>
+                  <Input
+                    id="edit-price"
+                    type="number"
+                    value={editingProduct.price}
+                    onChange={(e) => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)})}
+                    placeholder="0"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-stock">Stok</Label>
+                  <Input
+                    id="edit-stock"
+                    type="number"
+                    value={editingProduct.stock}
+                    onChange={(e) => setEditingProduct({...editingProduct, stock: parseInt(e.target.value)})}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-categoryId">Kategori</Label>
+                <Select value={editingProduct.categoryId.toString()} onValueChange={(value) => setEditingProduct({...editingProduct, categoryId: parseInt(value)})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih kategori" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map(category => (
+                      <SelectItem key={category.id} value={category.id.toString()}>{category.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-status">Status</Label>
+                  <Select value={editingProduct.status} onValueChange={(value) => setEditingProduct({...editingProduct, status: value as any})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AVAILABLE">Tersedia</SelectItem>
+                      <SelectItem value="LOW_STOCK">Stok Rendah</SelectItem>
+                      <SelectItem value="OUT_OF_STOCK">Habis</SelectItem>
+                      <SelectItem value="DISCONTINUED">Discontinued</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-badge">Badge</Label>
+                  <Input
+                    id="edit-badge"
+                    value={editingProduct.badge || ''}
+                    onChange={(e) => setEditingProduct({...editingProduct, badge: e.target.value})}
+                    placeholder="Optional"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Batal
+            </Button>
+            <Button onClick={handleUpdateProduct}>
+              Update Produk
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
