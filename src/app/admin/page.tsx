@@ -1,61 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSession, signOut } from "next-auth/react";
-import Image from "next/image";
-import { AppSidebar } from "@/components/app-sidebar"
+import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Icon } from "@iconify/react"
 import { toast } from "sonner"
-import { ImageUpload } from "@/components/ui/image-upload"
-
-// Type definitions based on Prisma schema
-interface Category {
-  id: number;
-  name: string;
-  slug: string;
-  description?: string;
-  _count?: {
-    products: number;
-  };
-}
-
-interface Product {
-  id: number;
-  name: string;
-  slug: string;
-  description?: string;
-  price: number;
-  stock: number;
-  status: 'AVAILABLE' | 'LOW_STOCK' | 'OUT_OF_STOCK';
-  badge?: string;
-  images?: string;
-  image?: string | null; // For form handling
-  categoryId: number;
-  category: Category;
-  createdAt: string;
-  updatedAt: string;
-}
 
 interface Stats {
   totalProducts: number;
@@ -64,284 +16,73 @@ interface Stats {
   outOfStockProducts: number;
   totalCategories: number;
   totalOrders: number;
+  orderGrowth: string;
+  thisWeekOrders: number;
+  topCategories: Array<{
+    id: number;
+    name: string;
+    _count: { products: number };
+  }>;
+  recentActivities: RecentActivity[];
+}
+
+interface RecentActivity {
+  id: number;
+  type: 'order' | 'product' | 'stock';
+  message: string;
+  timestamp: string;
+  status?: 'success' | 'warning' | 'error';
 }
 
 export default function AdminDashboard() {
-  const { data: session } = useSession();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const router = useRouter();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
-
-  // Helper function to validate image URL
-  const isValidImageUrl = (url: string | null | undefined): url is string => {
-    if (!url || typeof url !== 'string' || url.trim().length === 0) {
-      return false;
-    }
-    try {
-      // Check if it's a valid URL format
-      new URL(url, window.location.origin);
-      return true;
-    } catch {
-      // If not a valid URL, check if it's a valid relative path
-      return url.startsWith('/') || url.startsWith('./') || url.startsWith('../');
-    }
-  };
-
-  // Helper function to get the first image from images field
-  const getFirstImage = (images: string | null | undefined): string | null => {
-    if (!images) return null;
-    
-    try {
-      // Try to parse as JSON array first
-      const parsed = JSON.parse(images);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed[0];
-      }
-      return images; // If not JSON, treat as single image URL
-    } catch {
-      // If JSON parse fails, treat as single image URL
-      return images;
-    }
-  };
-
-  // New product form state
-  const [newProduct, setNewProduct] = useState({
-    name: "",
-    description: "",
-    price: "",
-    stock: "",
-    categoryId: "",
-    status: "AVAILABLE",
-    badge: "",
-    image: null as string | null
-  });
 
   // Fetch data from API
   useEffect(() => {
-    fetchData();
+    fetchStats();
   }, []);
 
-  const fetchData = async () => {
+  const fetchStats = async () => {
     try {
       setLoading(true);
-      const [productsRes, categoriesRes, statsRes] = await Promise.all([
-        fetch('/api/products?includeDiscontinued=true'), // Include discontinued products in admin
-        fetch('/api/categories'),
-        fetch('/api/admin/stats')
-      ]);
-
-      if (productsRes.ok) {
-        const productsData = await productsRes.json();
-        setProducts(productsData.products);
-      }
-
-      if (categoriesRes.ok) {
-        const categoriesData = await categoriesRes.json();
-        setCategories(categoriesData.categories);
-      }
-
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        setStats(statsData.stats);
+      const response = await fetch('/api/admin/stats');
+      
+      if (response.ok) {
+        const data = await response.json();
+        setStats(data.stats);
+      } else {
+        toast.error('Gagal memuat statistik');
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
-      toast.error('Gagal memuat data');
+      console.error('Error fetching stats:', error);
+      toast.error('Gagal memuat data statistik');
     } finally {
       setLoading(false);
     }
   };
 
-  // Filter products based on search and category
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesCategory = categoryFilter === "all" || product.category.slug === categoryFilter;
-    return matchesSearch && matchesCategory;
-  });
-
-  // Add new product
-  const handleAddProduct = async () => {
-    try {
-      const productData = {
-        ...newProduct,
-        images: newProduct.image ? [newProduct.image] : []
-      };
-
-      const response = await fetch('/api/products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(productData),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setProducts([data.product, ...products]);
-        setNewProduct({
-          name: "",
-          description: "",
-          price: "",
-          stock: "",
-          categoryId: "",
-          status: "AVAILABLE",
-          badge: "",
-          image: null
-        });
-        setIsAddDialogOpen(false);
-        toast.success('Produk berhasil ditambahkan');
-        fetchData(); // Refresh stats
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Gagal menambahkan produk');
-      }
-    } catch (error) {
-      console.error('Error adding product:', error);
-      toast.error('Gagal menambahkan produk');
-    }
-  };
-
-  // Edit product
-  const handleEditProduct = (product: Product) => {
-    const currentImage = getFirstImage(product.images);
-    setEditingProduct({
-      ...product,
-      image: currentImage
-    });
-    setIsEditDialogOpen(true);
-  };
-
-  const handleUpdateProduct = async () => {
-    if (!editingProduct) return;
-
-    try {
-      const updateData = {
-        name: editingProduct.name,
-        description: editingProduct.description,
-        price: editingProduct.price,
-        stock: editingProduct.stock,
-        categoryId: editingProduct.categoryId,
-        status: editingProduct.status,
-        badge: editingProduct.badge,
-        images: editingProduct.image ? [editingProduct.image] : []
-      };
-
-      const response = await fetch(`/api/products/${editingProduct.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updateData),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setProducts(products.map(p => p.id === editingProduct.id ? data.product : p));
-        setIsEditDialogOpen(false);
-        setEditingProduct(null);
-        toast.success('Produk berhasil diupdate');
-        fetchData(); // Refresh stats
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Gagal mengupdate produk');
-      }
-    } catch (error) {
-      console.error('Error updating product:', error);
-      toast.error('Gagal mengupdate produk');
-    }
-  };
-
-  // Delete product
-  const handleDeleteProduct = async (id: number) => {
-    if (!confirm('Apakah Anda yakin ingin menghapus produk ini? Jika produk pernah dipesan, lebih baik mengubah status menjadi "Discontinued".')) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/products/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        setProducts(products.filter(p => p.id !== id));
-        toast.success('Produk berhasil dihapus');
-        fetchData(); // Refresh stats
-      } else {
-        const error = await response.json();
-        if (error.error.includes('has been ordered')) {
-          // If product can't be deleted because it has been ordered, offer to discontinue
-          if (confirm('Produk tidak dapat dihapus karena pernah dipesan. Apakah Anda ingin mengubah status menjadi "Discontinued" saja?')) {
-            handleDiscontinueProduct(id);
-          }
-        } else {
-          toast.error(error.error || 'Gagal menghapus produk');
-        }
-      }
-    } catch (error) {
-      console.error('Error deleting product:', error);
-      toast.error('Gagal menghapus produk');
-    }
-  };
-
-  // Discontinue product instead of deleting
-  const handleDiscontinueProduct = async (id: number) => {
-    try {
-      const response = await fetch(`/api/products/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          status: 'DISCONTINUED'
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setProducts(products.map(p => p.id === id ? data.product : p));
-        toast.success('Produk berhasil diubah menjadi discontinued');
-        fetchData(); // Refresh stats
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Gagal mengubah status produk');
-      }
-    } catch (error) {
-      console.error('Error discontinuing product:', error);
-      toast.error('Gagal mengubah status produk');
-    }
-  };
-
-  // Get status badge color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "AVAILABLE": return "bg-green-500";
-      case "LOW_STOCK": return "bg-yellow-500";
-      case "OUT_OF_STOCK": return "bg-red-500";
-      case "DISCONTINUED": return "bg-gray-500";
-      default: return "bg-gray-500";
-    }
-  };
-
-  // Get status display text
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case "AVAILABLE": return "Tersedia";
-      case "LOW_STOCK": return "Stok Rendah";
-      case "OUT_OF_STOCK": return "Habis";
-      case "DISCONTINUED": return "Discontinued";
-      default: return status;
-    }
-  };
-
   const handleLogout = () => {
     signOut({ callbackUrl: "/" });
+  };
+
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case 'order': return "ph:shopping-cart-bold";
+      case 'product': return "ph:package-bold";
+      case 'stock': return "ph:warning-bold";
+      default: return "ph:bell-bold";
+    }
+  };
+
+  const getActivityColor = (status?: string) => {
+    switch (status) {
+      case 'success': return "text-green-600";
+      case 'warning': return "text-yellow-600";
+      case 'error': return "text-red-600";
+      default: return "text-slate-600";
+    }
   };
 
   if (loading) {
@@ -353,415 +94,352 @@ export default function AdminDashboard() {
   }
 
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "calc(var(--spacing) * 72)",
-          "--header-height": "calc(var(--spacing) * 12)",
-        } as React.CSSProperties
-      }
-    >
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        {/* Custom Header for Admin */}
-        <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1"/>
-          <div className="flex flex-1 items-center gap-2">
-            <Icon icon="ph:glasses-bold" className="h-5 w-5 text-blue-600" />
-            <span className="font-semibold">Admin Dashboard</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              {session?.user?.name} ({session?.user?.role})
-            </span>
-            <Button variant="outline" size="sm" onClick={handleLogout}>
-              <Icon icon="ph:sign-out-bold" className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </header>
+    <>
+      {/* Custom Header for Admin */}
+      <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
+        <SidebarTrigger className="-ml-1"/>
+        <div className="flex flex-1 items-center gap-2">
+          <Icon icon="ph:chart-line-bold" className="h-5 w-5 text-blue-600" />
+          <span className="font-semibold">Dashboard Analytics</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleLogout}>
+            <Icon icon="ph:sign-out-bold" className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
+        </div>
+      </header>
 
-        <div className="flex flex-1 flex-col">
-          <div className="@container/main flex flex-1 flex-col gap-2">
-            <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+      <div className="flex flex-1 flex-col">
+        <div className="@container/main flex flex-1 flex-col gap-2">
+          <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
               
-              {/* Header Section */}
-              <div className="px-4 lg:px-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Dashboard KacaMeta</h1>
-                    <p className="text-slate-600">Kelola produk kacamata Anda</p>
-                  </div>
-                  <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button className="bg-blue-600 hover:bg-blue-700">
-                        <Icon icon="ph:plus-bold" className="mr-2 h-4 w-4" />
-                        Tambah Produk
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-                      <DialogHeader>
-                        <DialogTitle>Tambah Produk Baru</DialogTitle>
-                        <DialogDescription>
-                          Tambahkan produk kacamata baru ke katalog Anda.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="grid gap-4 py-4">
-                        <div className="grid gap-2">
-                          <Label htmlFor="name">Nama Produk</Label>
-                          <Input
-                            id="name"
-                            value={newProduct.name}
-                            onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
-                            placeholder="Masukkan nama produk"
-                          />
+            {/* Header Section */}
+            <div className="px-4 lg:px-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-3xl font-bold text-slate-900">Dashboard KacaMeta</h1>
+                  <p className="text-slate-600">Selamat datang! Berikut ringkasan bisnis Anda hari ini</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => router.push('/admin/products')}
+                    className="hidden sm:flex"
+                  >
+                    <Icon icon="ph:package-bold" className="mr-2 h-4 w-4" />
+                    Kelola Produk
+                  </Button>
+                  <Button 
+                    onClick={() => router.push('/admin/categories')}
+                    className="bg-blue-600 hover:bg-blue-700 hidden sm:flex"
+                  >
+                    <Icon icon="ph:tag-bold" className="mr-2 h-4 w-4" />
+                    Kelola Kategori
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Performance Summary */}
+            <div className="px-4 lg:px-6">
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="flex items-center justify-between p-4 rounded-lg bg-green-50 hover:bg-green-100 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-full bg-green-100">
+                          <Icon icon="ph:shopping-cart-bold" className="h-4 w-4 text-green-600" />
                         </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="description">Deskripsi</Label>
-                          <Input
-                            id="description"
-                            value={newProduct.description}
-                            onChange={(e) => setNewProduct({...newProduct, description: e.target.value})}
-                            placeholder="Masukkan deskripsi produk"
-                          />
-                        </div>
-                        <ImageUpload
-                          onImageSelect={(imageBase64) => setNewProduct({...newProduct, image: imageBase64})}
-                          currentImage={newProduct.image}
-                        />
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="grid gap-2">
-                            <Label htmlFor="price">Harga</Label>
-                            <Input
-                              id="price"
-                              type="number"
-                              value={newProduct.price}
-                              onChange={(e) => setNewProduct({...newProduct, price: e.target.value})}
-                              placeholder="0"
-                            />
-                          </div>
-                          <div className="grid gap-2">
-                            <Label htmlFor="stock">Stok</Label>
-                            <Input
-                              id="stock"
-                              type="number"
-                              value={newProduct.stock}
-                              onChange={(e) => setNewProduct({...newProduct, stock: e.target.value})}
-                              placeholder="0"
-                            />
-                          </div>
-                        </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="categoryId">Kategori</Label>
-                          <Select value={newProduct.categoryId} onValueChange={(value) => setNewProduct({...newProduct, categoryId: value})}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Pilih kategori" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {categories.map(category => (
-                                <SelectItem key={category.id} value={category.id.toString()}>{category.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="grid gap-2">
-                            <Label htmlFor="status">Status</Label>
-                            <Select value={newProduct.status} onValueChange={(value) => setNewProduct({...newProduct, status: value})}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Pilih status" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="AVAILABLE">Tersedia</SelectItem>
-                                <SelectItem value="LOW_STOCK">Stok Rendah</SelectItem>
-                                <SelectItem value="OUT_OF_STOCK">Habis</SelectItem>
-                                <SelectItem value="DISCONTINUED">Discontinued</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="grid gap-2">
-                            <Label htmlFor="badge">Badge</Label>
-                            <Input
-                              id="badge"
-                              value={newProduct.badge}
-                              onChange={(e) => setNewProduct({...newProduct, badge: e.target.value})}
-                              placeholder="Optional"
-                            />
-                          </div>
+                        <div>
+                          <p className="text-sm font-medium">Pesanan Minggu Ini</p>
+                          <p className="text-xs text-muted-foreground">vs minggu lalu</p>
                         </div>
                       </div>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                          Batal
-                        </Button>
-                        <Button onClick={handleAddProduct} disabled={!newProduct.name || !newProduct.price || !newProduct.categoryId}>
-                          Tambah Produk
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </div>
-
-              {/* Statistics Cards */}
-              <div className="px-4 lg:px-6">
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Produk</CardTitle>
-                      <Icon icon="ph:glasses-bold" className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{stats?.totalProducts || 0}</div>
-                      <p className="text-xs text-muted-foreground">Semua kategori</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Stok</CardTitle>
-                      <Icon icon="ph:package-bold" className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{stats?.totalStock || 0}</div>
-                      <p className="text-xs text-muted-foreground">Unit tersedia</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Stok Rendah</CardTitle>
-                      <Icon icon="ph:warning-bold" className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold text-yellow-600">{stats?.lowStockProducts || 0}</div>
-                      <p className="text-xs text-muted-foreground">Kurang dari 10 unit</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Habis Stok</CardTitle>
-                      <Icon icon="ph:x-circle-bold" className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold text-red-600">{stats?.outOfStockProducts || 0}</div>
-                      <p className="text-xs text-muted-foreground">Perlu restok</p>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-
-              {/* Product Management */}
-              <div className="px-4 lg:px-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Manajemen Produk</CardTitle>
-                    <div className="flex flex-col sm:flex-row gap-4">
-                      <Input
-                        placeholder="Cari produk..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="max-w-sm"
-                      />
-                      <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                        <SelectTrigger className="max-w-sm">
-                          <SelectValue placeholder="Pilih kategori" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Semua Kategori</SelectItem>
-                          {categories.map(category => (
-                            <SelectItem key={category.id} value={category.slug}>{category.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-green-600">{stats?.thisWeekOrders || 0}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {stats?.orderGrowth ? `${parseFloat(stats.orderGrowth) > 0 ? '+' : ''}${stats.orderGrowth}%` : 'N/A'}
+                        </p>
+                      </div>
                     </div>
+
+                    <div className="flex items-center justify-between p-4 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-full bg-blue-100">
+                          <Icon icon="ph:package-bold" className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">Produk Aktif</p>
+                          <p className="text-xs text-muted-foreground">Status tersedia</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-blue-600">
+                          {stats ? stats.totalProducts - stats.outOfStockProducts : 0}
+                        </p>
+                        <p className="text-xs text-muted-foreground">dari {stats?.totalProducts || 0} total</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-full bg-purple-100">
+                          <Icon icon="ph:tag-bold" className="h-4 w-4 text-purple-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">Kategori</p>
+                          <p className="text-xs text-muted-foreground">Total kategori</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-purple-600">{stats?.totalCategories || 0}</p>
+                        <p className="text-xs text-muted-foreground">kategori aktif</p>
+                      </div>
+                    </div>
+                  </div>
+            </div>
+
+            {/* Statistics Cards with Integrated Actions */}
+            <div className="px-4 lg:px-6">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                {/* Products Card */}
+                <Card className="hover:shadow-lg transition-all duration-200 group">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Produk</CardTitle>
+                    <Icon icon="mdi:glasses" className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Gambar</TableHead>
-                          <TableHead>Nama Produk</TableHead>
-                          <TableHead>Kategori</TableHead>
-                          <TableHead>Harga</TableHead>
-                          <TableHead>Stok</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Badge</TableHead>
-                          <TableHead>Aksi</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredProducts.map((product) => {
-                          const firstImage = getFirstImage(product.images);
-                          return (
-                          <TableRow key={product.id}>
-                            <TableCell>
-                              {isValidImageUrl(firstImage) ? (
-                                <Image 
-                                  src={firstImage} 
-                                  alt={product.name}
-                                  width={64}
-                                  height={64}
-                                  className="w-16 h-16 object-cover rounded-lg border"
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = 'none';
-                                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                                  }}
-                                />
-                              ) : null}
-                              <div className={`w-16 h-16 bg-gray-100 rounded-lg border flex items-center justify-center ${isValidImageUrl(firstImage) ? 'hidden' : ''}`}>
-                                <Icon icon="ph:image-bold" className="h-6 w-6 text-gray-400" />
-                              </div>
-                            </TableCell>
-                            <TableCell className="font-medium">{product.name}</TableCell>
-                            <TableCell>{product.category.name}</TableCell>
-                            <TableCell>Rp {product.price.toLocaleString('id-ID')}</TableCell>
-                            <TableCell>{product.stock}</TableCell>
-                            <TableCell>
-                              <Badge className={getStatusColor(product.status)}>
-                                {getStatusText(product.status)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {product.badge && (
-                                <Badge variant="outline">{product.badge}</Badge>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex space-x-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleEditProduct(product)}
-                                >
-                                  <Icon icon="ph:pencil-bold" className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleDeleteProduct(product.id)}
-                                  className="text-red-600 hover:text-red-700"
-                                >
-                                  <Icon icon="ph:trash-bold" className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )})}
-                      </TableBody>
-                    </Table>
+                    <div className="text-2xl font-bold">{stats?.totalProducts || 0}</div>
+                    <p className="text-xs text-muted-foreground mb-3">Semua kategori</p>
+                    <Button 
+                      size="sm" 
+                      className="w-full bg-blue-600 hover:bg-blue-700"
+                      onClick={() => router.push('/admin/products')}
+                    >
+                      <Icon icon="ph:package-bold" className="mr-2 h-4 w-4" />
+                      Kelola Produk
+                    </Button>
+                  </CardContent>
+                </Card>
+                
+                {/* Categories Card */}
+                <Card className="hover:shadow-lg transition-all duration-200 group">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Kategori</CardTitle>
+                    <Icon icon="ph:tag-bold" className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{stats?.totalCategories || 0}</div>
+                    <p className="text-xs text-muted-foreground mb-3">Kategori aktif</p>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => router.push('/admin/categories')}
+                    >
+                      <Icon icon="ph:tag-bold" className="mr-2 h-4 w-4" />
+                      Kelola Kategori
+                    </Button>
+                  </CardContent>
+                </Card>
+                
+                {/* Orders Card */}
+                <Card className="hover:shadow-lg transition-all duration-200 group">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Pesanan</CardTitle>
+                    <Icon icon="ph:shopping-cart-bold" className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{stats?.totalOrders || 0}</div>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      {stats?.orderGrowth ? `${stats.orderGrowth}% vs minggu lalu` : 'Semua pesanan'}
+                    </p>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => router.push('/admin/orders')}
+                    >
+                      <Icon icon="ph:shopping-cart-bold" className="mr-2 h-4 w-4" />
+                      Lihat Pesanan
+                    </Button>
+                  </CardContent>
+                </Card>
+                
+                {/* Stock Overview Card */}
+                <Card className="hover:shadow-lg transition-all duration-200 group">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Stok</CardTitle>
+                    <Icon icon="ph:package-bold" className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{stats?.totalStock || 0}</div>
+                    <p className="text-xs text-muted-foreground mb-3">Unit tersedia</p>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => router.push('/admin/products?tab=stock')}
+                    >
+                      <Icon icon="ph:eye-bold" className="mr-2 h-4 w-4" />
+                      Lihat Stok
+                    </Button>
                   </CardContent>
                 </Card>
               </div>
-
             </div>
+
+            {/* Stock Alert Cards */}
+            {(stats?.lowStockProducts || stats?.outOfStockProducts) && (
+              <div className="px-4 lg:px-6">
+                <div className="grid gap-4 md:grid-cols-2">
+                  {stats?.lowStockProducts > 0 && (
+                    <Card className="border-yellow-200 bg-yellow-50 hover:shadow-lg transition-all duration-200">
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-yellow-800">Stok Rendah</CardTitle>
+                        <Icon icon="ph:warning-bold" className="h-4 w-4 text-yellow-600" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-yellow-700">{stats.lowStockProducts}</div>
+                        <p className="text-xs text-yellow-600 mb-3">Produk perlu perhatian</p>
+                        <Button 
+                          size="sm" 
+                          className="w-full bg-yellow-600 hover:bg-yellow-700 text-white"
+                          onClick={() => router.push('/admin/products?status=LOW_STOCK')}
+                        >
+                          <Icon icon="ph:warning-bold" className="mr-2 h-4 w-4" />
+                          Lihat Produk
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
+                  
+                  {stats?.outOfStockProducts > 0 && (
+                    <Card className="border-red-200 bg-red-50 hover:shadow-lg transition-all duration-200">
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-red-800">Habis Stok</CardTitle>
+                        <Icon icon="ph:x-circle-bold" className="h-4 w-4 text-red-600" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-red-700">{stats.outOfStockProducts}</div>
+                        <p className="text-xs text-red-600 mb-3">Produk perlu restok</p>
+                        <Button 
+                          size="sm" 
+                          className="w-full bg-red-600 hover:bg-red-700 text-white"
+                          onClick={() => router.push('/admin/products?status=OUT_OF_STOCK')}
+                        >
+                          <Icon icon="ph:x-circle-bold" className="mr-2 h-4 w-4" />
+                          Lihat Produk
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Analytics & Insights */}
+            <div className="px-4 lg:px-6">
+              <div className="grid gap-4 lg:grid-cols-3">
+                
+                {/* Recent Activities */}
+                <Card className="lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Icon icon="ph:clock-bold" className="h-5 w-5" />
+                      Aktivitas Terbaru
+                    </CardTitle>
+                    <CardDescription>Pembaruan sistem dan aktivitas bisnis</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {stats?.recentActivities && stats.recentActivities.length > 0 ? (
+                        stats.recentActivities.map((activity) => (
+                          <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors">
+                            <div className={`p-2 rounded-full bg-white ${getActivityColor(activity.status)}`}>
+                              <Icon icon={getActivityIcon(activity.type)} className="h-4 w-4" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-slate-900">{activity.message}</p>
+                              <p className="text-xs text-slate-500">{activity.timestamp}</p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8">
+                          <Icon icon="ph:clock-bold" className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                          <p className="text-slate-500">Belum ada aktivitas terbaru</p>
+                        </div>
+                      )}
+                    </div>
+                    {stats?.recentActivities && stats.recentActivities.length > 0 && (
+                      <Button variant="outline" className="w-full mt-4">
+                        <Icon icon="ph:list-bold" className="mr-2 h-4 w-4" />
+                        Lihat Semua Aktivitas
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Top Categories */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Icon icon="ph:chart-bar-bold" className="h-5 w-5" />
+                      Kategori Terpopuler
+                    </CardTitle>
+                    <CardDescription>Berdasarkan jumlah produk</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {stats?.topCategories && stats.topCategories.length > 0 ? (
+                        stats.topCategories.map((category, index) => (
+                          <div key={category.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-full bg-blue-100">
+                                <span className="text-sm font-bold text-blue-600">#{index + 1}</span>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium">{category.name}</p>
+                                <p className="text-xs text-muted-foreground">{category._count.products} produk</p>
+                              </div>
+                            </div>
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              onClick={() => router.push(`/admin/products?category=${category.id}`)}
+                            >
+                              <Icon icon="ph:arrow-right-bold" className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8">
+                          <Icon icon="ph:tag-bold" className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                          <p className="text-slate-500">Belum ada kategori</p>
+                        </div>
+                      )}
+                    </div>
+                    {stats?.topCategories && stats.topCategories.length > 0 && (
+                      <Button 
+                        variant="outline" 
+                        className="w-full mt-4"
+                        onClick={() => router.push('/admin/categories')}
+                      >
+                        <Icon icon="ph:tag-bold" className="mr-2 h-4 w-4" />
+                        Kelola Kategori
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+
+              </div>
+            </div>
+
           </div>
         </div>
-      </SidebarInset>
-
-      {/* Edit Product Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Produk</DialogTitle>
-            <DialogDescription>
-              Update informasi produk kacamata.
-            </DialogDescription>
-          </DialogHeader>
-          {editingProduct && (
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="edit-name">Nama Produk</Label>
-                <Input
-                  id="edit-name"
-                  value={editingProduct.name}
-                  onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})}
-                  placeholder="Masukkan nama produk"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-description">Deskripsi</Label>
-                <Input
-                  id="edit-description"
-                  value={editingProduct.description || ''}
-                  onChange={(e) => setEditingProduct({...editingProduct, description: e.target.value})}
-                  placeholder="Masukkan deskripsi produk"
-                />
-              </div>
-              <ImageUpload
-                onImageSelect={(imageBase64) => setEditingProduct({...editingProduct, image: imageBase64})}
-                currentImage={editingProduct.image}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-price">Harga</Label>
-                  <Input
-                    id="edit-price"
-                    type="number"
-                    value={editingProduct.price}
-                    onChange={(e) => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)})}
-                    placeholder="0"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-stock">Stok</Label>
-                  <Input
-                    id="edit-stock"
-                    type="number"
-                    value={editingProduct.stock}
-                    onChange={(e) => setEditingProduct({...editingProduct, stock: parseInt(e.target.value)})}
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-categoryId">Kategori</Label>
-                <Select value={editingProduct.categoryId.toString()} onValueChange={(value) => setEditingProduct({...editingProduct, categoryId: parseInt(value)})}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih kategori" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map(category => (
-                      <SelectItem key={category.id} value={category.id.toString()}>{category.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-status">Status</Label>
-                  <Select value={editingProduct.status} onValueChange={(value) => setEditingProduct({...editingProduct, status: value as any})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="AVAILABLE">Tersedia</SelectItem>
-                      <SelectItem value="LOW_STOCK">Stok Rendah</SelectItem>
-                      <SelectItem value="OUT_OF_STOCK">Habis</SelectItem>
-                      <SelectItem value="DISCONTINUED">Discontinued</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-badge">Badge</Label>
-                  <Input
-                    id="edit-badge"
-                    value={editingProduct.badge || ''}
-                    onChange={(e) => setEditingProduct({...editingProduct, badge: e.target.value})}
-                    placeholder="Optional"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Batal
-            </Button>
-            <Button onClick={handleUpdateProduct}>
-              Update Produk
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </SidebarProvider>
+      </div>
+    </>
   )
 }
+
+
