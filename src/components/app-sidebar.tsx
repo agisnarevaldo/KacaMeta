@@ -1,181 +1,164 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import {
-  IconCamera,
-  IconChartBar,
-  IconDashboard,
-  IconDatabase,
-  IconFileAi,
-  IconFileDescription,
-  IconFileWord,
-  IconFolder,
-  IconHelp,
-  IconInnerShadowTop,
-  IconListDetails,
-  IconReport,
-  IconSearch,
-  IconSettings,
-  IconUsers,
-} from "@tabler/icons-react"
-
-import { NavDocuments } from "@/components/nav-documents"
-import { NavMain } from "@/components/nav-main"
-import { NavSecondary } from "@/components/nav-secondary"
-import { NavUser } from "@/components/nav-user"
+import * as React from "react";
+import { useSession, signOut } from "next-auth/react";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
+  SidebarRail,
+} from "@/components/ui/sidebar";
+import { Icon } from "@iconify/react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Button } from "@/components/ui/button";
 
 const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
   navMain: [
     {
       title: "Dashboard",
-      url: "#",
-      icon: IconDashboard,
-    },
-    {
-      title: "Lifecycle",
-      url: "#",
-      icon: IconListDetails,
-    },
-    {
-      title: "Analytics",
-      url: "#",
-      icon: IconChartBar,
-    },
-    {
-      title: "Projects",
-      url: "#",
-      icon: IconFolder,
-    },
-    {
-      title: "Team",
-      url: "#",
-      icon: IconUsers,
-    },
-  ],
-  navClouds: [
-    {
-      title: "Capture",
-      icon: IconCamera,
+      url: "/admin",
+      icon: "ph:house-bold",
       isActive: true,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
+      items: [],
     },
     {
-      title: "Proposal",
-      icon: IconFileDescription,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
+      title: "Produk",
+      url: "/admin/products",
+      icon: "ph:package-bold",
+      items: [],
     },
     {
-      title: "Prompts",
-      icon: IconFileAi,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
+      title: "Kategori",
+      url: "/admin/categories",
+      icon: "ph:tag-bold",
+      items: [],
+    },
+    {
+      title: "Pesanan",
+      url: "/admin/orders",
+      icon: "ph:shopping-cart-bold",
+      items: [],
     },
   ],
-  navSecondary: [
+  superAdminNav: [
     {
-      title: "Settings",
-      url: "#",
-      icon: IconSettings,
+      title: "Kelola Admin",
+      url: "/admin/manage-admins",
+      icon: "ph:users-bold",
+      items: [],
     },
     {
-      title: "Get Help",
-      url: "#",
-      icon: IconHelp,
-    },
-    {
-      title: "Search",
-      url: "#",
-      icon: IconSearch,
+      title: "Sistem",
+      url: "/admin/system",
+      icon: "ph:gear-bold", 
+      items: [],
     },
   ],
-  documents: [
-    {
-      name: "Data Library",
-      url: "#",
-      icon: IconDatabase,
-    },
-    {
-      name: "Reports",
-      url: "#",
-      icon: IconReport,
-    },
-    {
-      name: "Word Assistant",
-      url: "#",
-      icon: IconFileWord,
-    },
-  ],
-}
+};
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { data: session } = useSession();
+  const pathname = usePathname();
+
+  const handleLogout = async () => {
+    await signOut({ redirect: true, callbackUrl: "/" });
+  };
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
-      <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              className="data-[slot=sidebar-menu-button]:!p-1.5"
-            >
-              <a href="#">
-                <IconInnerShadowTop className="!size-5" />
-                <span className="text-base font-semibold">KacaMeta Inc.</span>
-              </a>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+      <SidebarHeader className="border-b">
+        <div className="flex items-center space-x-2 gap-2">
+          <Icon icon="mdi:glasses" className="h-8 w-8 text-blue-600" />
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">KacaMeta</h2>
+            {/* <p className="text-sm text-slate-500">Admin Dashboard</p> */}
+          </div>
+        </div>
       </SidebarHeader>
+      
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavDocuments items={data.documents} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <SidebarGroup>
+          <SidebarGroupLabel>Menu Utama</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {data.navMain.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === item.url}
+                  >
+                    <Link href={item.url} className="flex items-center space-x-2">
+                      <Icon icon={item.icon} className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Super Admin Menu */}
+        {session?.user?.role === 'SUPER_ADMIN' && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Super Admin</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {data.superAdminNav.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname === item.url}
+                    >
+                      <Link href={item.url} className="flex items-center space-x-2">
+                        <Icon icon={item.icon} className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
-      <SidebarFooter>
-        <NavUser user={data.user} />
+      
+      <SidebarFooter className="border-t">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2 gap-2">
+            <div className="h-8 w-8 bg-blue-600 rounded-full flex items-center justify-center">
+              <span className="text-white text-sm font-medium">
+                {session?.user?.username?.[0]?.toUpperCase()}
+              </span>
+            </div>
+            <div>
+              <p className="text-sm font-medium">
+                {(session?.user?.username?.[0]?.toUpperCase() || "") + (session?.user?.username?.slice(1) || "")}
+              </p>
+              <p className="text-xs text-slate-500">
+                {session?.user?.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'}
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="lg"
+            onClick={handleLogout}
+            className="text-slate-500 hover:text-slate-700"
+          >
+            <Icon icon="ph:sign-out-bold" className="h-4 w-4" />
+          </Button>
+        </div>
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
-  )
+  );
 }
