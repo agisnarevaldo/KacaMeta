@@ -12,6 +12,9 @@ const compat = new FlatCompat({
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
+    ignores: ["src/generated/**/*"],
+  },
+  {
     rules: {
       "no-console": "off", // Allow console statements for debugging
       // "react-hooks/exhaustive-deps": "off", // Disable exhaustive-deps warnings for React hooks

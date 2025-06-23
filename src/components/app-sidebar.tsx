@@ -41,6 +41,12 @@ const data = {
       icon: "ph:tag-bold",
       items: [],
     },
+    // {
+    //   title: "Konsultasi",
+    //   url: "/admin/consultations",
+    //   icon: "ph:chat-circle-dots-bold",
+    //   items: [],
+    // },
     {
       title: "Pesanan",
       url: "/admin/orders",

@@ -102,6 +102,7 @@ model Admin {
   updatedAt DateTime @updatedAt
 
   @@map("admins")
+  PrescriptionConsultation PrescriptionConsultation[]
 }
 
 enum ProductStatus {
@@ -123,4 +124,82 @@ enum OrderStatus {
 enum AdminRole {
   SUPER_ADMIN
   ADMIN
+}
+
+// Add to your schema.prisma
+
+model BotpressSession {
+  id                String   @id @default(cuid())
+  botpressUserId    String   @unique
+  phoneNumber       String?
+  customerName      String?
+  conversationId    String?
+  sessionData       Json?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  consultations     PrescriptionConsultation[]
+  
+  @@map("botpress_sessions")
+}
+
+model PrescriptionConsultation {
+  id                String   @id @default(cuid())
+  
+  // Customer info
+  customerName      String
+  phoneNumber       String
+  email             String?
+  
+  // Prescription data
+  rightEyeSPH       String?
+  rightEyeCYL       String?
+  rightEyeAXIS      String?
+  rightEyeADD       String?
+  leftEyeSPH        String?
+  leftEyeCYL        String?
+  leftEyeAXIS       String?
+  leftEyeADD        String?
+  pd                String?
+  
+  // Files & notes
+  prescriptionImage String?
+  notes             String?
+  framePreference   String?
+  budgetRange       String?
+  
+  // Status tracking
+  status            ConsultationStatus @default(PENDING)
+  priority          ConsultationPriority @default(NORMAL)
+  source            String @default("BOTPRESS")
+  assignedTo        Int?
+  
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  responseDeadline  DateTime?
+  
+  // Relations
+  assignedAdmin     Admin? @relation(fields: [assignedTo], references: [id])
+  botpressSession   BotpressSession? @relation(fields: [botpressSessionId], references: [id])
+  botpressSessionId String?
+  
+  @@map("prescription_consultations")
+}
+
+enum ConsultationStatus {
+  PENDING
+  IN_PROGRESS
+  WAITING_CUSTOMER
+  COMPLETED
+  CANCELLED
+}
+
+enum ConsultationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
 }

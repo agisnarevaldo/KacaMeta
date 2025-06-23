@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../../auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { $Enums } from "@/generated/prisma"
 
@@ -9,7 +9,7 @@ type AdminRole = $Enums.AdminRole
 // PUT - Update admin (Super Admin only)
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -21,7 +21,8 @@ export async function PUT(
       );
     }
 
-    const adminId = parseInt(params.id);
+    const resolvedParams = await params;
+    const adminId = parseInt(resolvedParams.id);
     const { name, username, email, role } = await request.json();
 
     if (!name || !username || !email) {
@@ -98,7 +99,7 @@ export async function PUT(
 // DELETE - Delete admin (Super Admin only)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -110,7 +111,8 @@ export async function DELETE(
       );
     }
 
-    const adminId = parseInt(params.id);
+    const resolvedParams = await params;
+    const adminId = parseInt(resolvedParams.id);
 
     // Prevent self-deletion
     if (session.user.id === adminId.toString()) {

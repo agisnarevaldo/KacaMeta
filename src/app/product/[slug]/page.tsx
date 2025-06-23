@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ export default function ProductDetail() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [whatsappNumber, setWhatsappNumber] = useState<string>("6281234567890");
 
   // Helper function to get images array from images field
   const getImages = (images: string | null | undefined): string[] => {
@@ -69,19 +70,18 @@ export default function ProductDetail() {
     }
   };
 
-  useEffect(() => {
-    if (params.slug) {
-      fetchProduct(params.slug as string);
-    }
-  }, [params.slug]);
-
-  const fetchProduct = async (slug: string) => {
+  const fetchProduct = useCallback(async (slug: string) => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/products?slug=${slug}`);
       
-      if (response.ok) {
-        const data = await response.json();
+      // Fetch product and WhatsApp config in parallel
+      const [productRes, whatsappRes] = await Promise.all([
+        fetch(`/api/products?slug=${slug}`),
+        fetch('/api/whatsapp-config')
+      ]);
+      
+      if (productRes.ok) {
+        const data = await productRes.json();
         const foundProduct = data.products.find((p: Product) => p.slug === slug);
         if (foundProduct) {
           setProduct(foundProduct);
@@ -92,15 +92,24 @@ export default function ProductDetail() {
       } else {
         router.push('/');
       }
+
+      if (whatsappRes.ok) {
+        const whatsappData = await whatsappRes.json();
+        setWhatsappNumber(whatsappData.whatsappNumber);
+      }
     } catch (error) {
-      console.error('Error fetching product:', error);
+      console.error('Error fetching data:', error);
       router.push('/');
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
 
-  const whatsappNumber = "6281234567890";
+  useEffect(() => {
+    if (params.slug) {
+      fetchProduct(params.slug as string);
+    }
+  }, [params.slug, fetchProduct]);
   
   const sendWhatsApp = (productName: string) => {
     const message = `Halo! Saya tertarik dengan ${productName}. Bisa info lebih lanjut?`;
@@ -158,37 +167,26 @@ export default function ProductDetail() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      {/* Navbar */}
-      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
+      {/* Simple Header */}
+      <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-2">
               <Icon icon="ph:glasses-bold" className="h-8 w-8 text-blue-600" />
               <span className="text-2xl font-bold text-slate-900">KacaMeta</span>
             </div>
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => router.push('/')}
-                className="flex items-center gap-2"
-              >
-                <Icon icon="ph:arrow-left-bold" className="h-4 w-4" />
-                Kembali
-              </Button>
-              <Button 
-                onClick={() => sendWhatsApp(product.name)} 
-                variant="outline" 
-                size="sm" 
-                className="flex items-center gap-2"
-              >
-                <Icon icon="ic:baseline-whatsapp" className="h-4 w-4" />
-                WhatsApp
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push('/')}
+              className="flex items-center gap-2"
+            >
+              <Icon icon="ph:arrow-left-bold" className="h-4 w-4" />
+              Kembali ke Katalog
+            </Button>
           </div>
         </div>
-      </nav>
+      </div>
 
       {/* Product Detail */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -319,41 +317,32 @@ export default function ProductDetail() {
                 }
               </Button>
               
-              <div className="grid grid-cols-2 gap-4">
-                <Button 
-                  variant="outline" 
-                  size="lg"
-                  onClick={() => router.push('/')}
-                  className="text-lg py-6"
-                >
-                  <Icon icon="ph:arrow-left-bold" className="mr-2 h-5 w-5" />
-                  Kembali
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="lg"
-                  onClick={() => router.push('/#katalog')}
-                  className="text-lg py-6"
-                >
-                  <Icon icon="ph:eye-bold" className="mr-2 h-5 w-5" />
-                  Lihat Katalog
-                </Button>
-              </div>
+              <Button 
+                variant="outline" 
+                size="lg"
+                onClick={() => router.push('/#katalog')}
+                className="w-full text-lg py-6"
+              >
+                <Icon icon="ph:eye-bold" className="mr-2 h-5 w-5" />
+                Lihat Produk Lainnya
+              </Button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Bubble Chat WhatsApp */}
-      <div className="fixed bottom-6 right-6 z-40">
-        <Button
-          size="lg"
-          className="rounded-full h-14 w-14 bg-green-500 hover:bg-green-600 shadow-lg hover:shadow-xl transition-all duration-300"
-          onClick={() => sendWhatsApp(product.name)}
-        >
-          <Icon icon="ic:baseline-whatsapp" className="h-6 w-6 text-white" />
-        </Button>
-      </div>
+      {/* Bubble Chat WhatsApp - Only show if product is not available */}
+      {(product.status === 'OUT_OF_STOCK' || product.status === 'DISCONTINUED') && (
+        <div className="fixed bottom-6 right-6 z-40">
+          <Button
+            size="lg"
+            className="rounded-full h-14 w-14 bg-gray-400 cursor-not-allowed shadow-lg"
+            disabled
+          >
+            <Icon icon="ic:baseline-whatsapp" className="h-6 w-6 text-white" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
