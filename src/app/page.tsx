@@ -37,7 +37,6 @@ export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [whatsappNumber, setWhatsappNumber] = useState("6281234567890"); // Default fallback
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Helper function to get the first image from images field
@@ -80,10 +79,9 @@ export default function Home() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [productsRes, categoriesRes, whatsappRes] = await Promise.all([
+      const [productsRes, categoriesRes] = await Promise.all([
         fetch('/api/products'),
-        fetch('/api/categories'),
-        fetch('/api/whatsapp-config')
+        fetch('/api/categories')
       ]);
 
       if (productsRes.ok) {
@@ -94,11 +92,6 @@ export default function Home() {
       if (categoriesRes.ok) {
         const categoriesData = await categoriesRes.json();
         setCategories(categoriesData.categories);
-      }
-
-      if (whatsappRes.ok) {
-        const whatsappData = await whatsappRes.json();
-        setWhatsappNumber(whatsappData.whatsappNumber);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -112,12 +105,12 @@ export default function Home() {
     product.status !== 'DISCONTINUED' // Hide discontinued products from customers
   );
   
-  const sendWhatsApp = (productName?: string) => {
+  const sendTelegram = (productName?: string) => {
     const message = productName 
       ? `Halo! Saya tertarik dengan ${productName}. Bisa info lebih lanjut?`
       : "Halo! Saya ingin melihat katalog kacamata KacaMeta.";
     
-    const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+    const url = `https://t.me/KacaMeta_bot?start=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
 
@@ -149,13 +142,13 @@ export default function Home() {
               <a href="#katalog" className="text-slate-700 hover:text-blue-600 transition-colors">Katalog</a>
               <a href="/admin" className="text-slate-700 hover:text-blue-600 transition-colors">Admin</a>
               <Button 
-                onClick={() => sendWhatsApp()} 
+                onClick={() => sendTelegram()} 
                 variant="outline" 
                 size="sm" 
                 className="flex items-center gap-2"
               >
-                <Icon icon="ic:baseline-whatsapp" className="h-4 w-4" />
-                WhatsApp
+                <Icon icon="ic:baseline-telegram" className="h-4 w-4" />
+                Telegram
               </Button>
             </div>
 
@@ -202,15 +195,15 @@ export default function Home() {
                 </a>
                 <Button 
                   onClick={() => {
-                    sendWhatsApp();
+                    sendTelegram();
                     setIsMobileMenuOpen(false);
                   }} 
                   variant="outline" 
                   size="sm"
                   className="w-full flex items-center justify-center gap-2 mt-4"
                 >
-                  <Icon icon="ic:baseline-whatsapp" className="h-4 w-4" />
-                  Chat WhatsApp
+                  <Icon icon="ic:baseline-telegram" className="h-4 w-4" />
+                  Chat Telegram
                 </Button>
               </div>
             </div>
@@ -219,17 +212,28 @@ export default function Home() {
       </nav>
 
       {/* Hero Section */}
-      <section id="beranda" className="relative py-12 sm:py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto text-center">
+      <section id="beranda" className="relative py-12 sm:py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-blue-50 via-white to-blue-100 overflow-hidden">
+        {/* Background decoration */}
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-transparent to-blue-600/10"></div>
+        <div className="absolute top-0 left-0 w-full h-full">
+          <div className="absolute top-10 left-10 w-32 h-32 bg-blue-200/20 rounded-full blur-xl"></div>
+          <div className="absolute top-32 right-20 w-24 h-24 bg-blue-300/15 rounded-full blur-lg"></div>
+          <div className="absolute bottom-20 left-1/4 w-40 h-40 bg-blue-100/25 rounded-full blur-2xl"></div>
+        </div>
+        
+        <div className="max-w-7xl mx-auto text-center relative z-10">
           <div className="mb-6 sm:mb-8">
-            <Icon icon="ph:glasses-bold" className="h-16 sm:h-20 w-16 sm:w-20 text-blue-600 mx-auto mb-4 sm:mb-6" />
-            <h1 className="text-3xl sm:text-4xl lg:text-6xl font-bold text-slate-900 mb-4 sm:mb-6">
-              Kaca<span className="text-blue-600">Meta</span>
+            <div className="relative mb-4 sm:mb-6">
+              <Icon icon="ph:glasses-bold" className="h-16 sm:h-20 w-16 sm:w-20 text-blue-600 mx-auto drop-shadow-lg" />
+              <div className="absolute inset-0 bg-blue-600/20 rounded-full blur-xl transform scale-150"></div>
+            </div>
+            <h1 className="text-3xl sm:text-4xl lg:text-6xl font-bold text-slate-900 mb-4 sm:mb-6 drop-shadow-sm">
+              Kaca<span className="text-transparent bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 bg-clip-text">Meta</span>
             </h1>
-            <p className="text-lg sm:text-xl lg:text-2xl text-slate-600 mb-6 sm:mb-8 max-w-3xl mx-auto px-4">
+            <p className="text-lg sm:text-xl lg:text-2xl text-slate-700 mb-6 sm:mb-8 max-w-3xl mx-auto px-4 font-medium">
               Lihat Lebih Jelas. Tampil Lebih Tajam.
             </p>
-            <p className="text-base sm:text-lg text-slate-500 mb-8 sm:mb-12 max-w-2xl mx-auto px-4">
+            <p className="text-base sm:text-lg text-slate-600 mb-8 sm:mb-12 max-w-2xl mx-auto px-4">
               Koleksi kacamata premium dengan kualitas terbaik untuk gaya hidup modern Anda
             </p>
           </div>
@@ -237,7 +241,7 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center px-4">
             <Button 
               size="lg" 
-              className="w-full sm:w-auto px-6 sm:px-8 py-3 text-base sm:text-lg bg-blue-600 hover:bg-blue-700"
+              className="w-full sm:w-auto px-6 sm:px-8 py-3 text-base sm:text-lg bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
               onClick={() => document.getElementById('katalog')?.scrollIntoView({ behavior: 'smooth' })}
             >
               <Icon icon="ph:eye-bold" className="mr-2 h-4 sm:h-5 w-4 sm:w-5" />
@@ -246,11 +250,11 @@ export default function Home() {
             <Button 
               variant="outline" 
               size="lg" 
-              className="w-full sm:w-auto px-6 sm:px-8 py-3 text-base sm:text-lg border-green-500 text-green-600 hover:bg-green-50"
-              onClick={() => sendWhatsApp()}
+              className="w-full sm:w-auto px-6 sm:px-8 py-3 text-base sm:text-lg border-2 border-blue-500 text-blue-600 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:border-blue-600 shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105"
+              onClick={() => sendTelegram()}
             >
-              <Icon icon="ic:baseline-whatsapp" className="mr-2 h-4 sm:h-5 w-4 sm:w-5" />
-              Chat di WhatsApp
+              <Icon icon="ic:baseline-telegram" className="mr-2 h-4 sm:h-5 w-4 sm:w-5" />
+              Chat di Telegram
             </Button>
           </div>
         </div>
@@ -332,13 +336,13 @@ export default function Home() {
                     Detail
                   </Button>
                   <Button 
-                    className="w-full sm:flex-1 bg-green-600 hover:bg-green-700 text-white text-sm"
+                    className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      sendWhatsApp(product.name);
+                      sendTelegram(product.name);
                     }}
                   >
-                    <Icon icon="ic:baseline-whatsapp" className="mr-2 h-4 w-4" />
+                    <Icon icon="ic:baseline-telegram" className="mr-2 h-4 w-4" />
                     Pesan
                   </Button>
                 </CardFooter>
@@ -348,18 +352,18 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Bubble Chat WhatsApp */}
+      {/* Bubble Chat Telegram - (Commented out, using ChatHybrid instead) */}
       {/* <div className="fixed bottom-6 right-6 z-40">
         <Button
           size="lg"
-          className="rounded-full h-14 w-14 bg-green-500 hover:bg-green-600 shadow-lg hover:shadow-xl transition-all duration-300"
-          onClick={() => sendWhatsApp()}
+          className="rounded-full h-14 w-14 bg-blue-500 hover:bg-blue-600 shadow-lg hover:shadow-xl transition-all duration-300"
+          onClick={() => sendTelegram()}
         >
-          <Icon icon="ic:baseline-whatsapp" className="h-6 w-6 text-white" />
+          <Icon icon="ic:baseline-telegram" className="h-6 w-6 text-white" />
         </Button>
       </div> */}
 
-      {/* Chat System - Botpress with WhatsApp fallback */}
+      {/* Chat System - Botpress with Telegram fallback */}
       <ChatHybrid />
       
 
@@ -381,8 +385,8 @@ export default function Home() {
               <h3 className="text-base sm:text-lg font-semibold mb-4">Kontak</h3>
               <div className="space-y-2">
                 <div className="flex items-center justify-center sm:justify-start space-x-2">
-                  <Icon icon="ic:baseline-whatsapp" className="h-4 sm:h-5 w-4 sm:w-5 text-green-400" />
-                  <span className="text-slate-400 text-sm sm:text-base">+62 812-3456-7890</span>
+                  <Icon icon="ic:baseline-telegram" className="h-4 sm:h-5 w-4 sm:w-5 text-blue-400" />
+                  <span className="text-slate-400 text-sm sm:text-base">@KacaMeta_bot</span>
                 </div>
                 <div className="flex items-center justify-center sm:justify-start space-x-2">
                   <Icon icon="ic:baseline-email" className="h-4 sm:h-5 w-4 sm:w-5 text-blue-400" />
@@ -396,7 +400,7 @@ export default function Home() {
               <div className="flex justify-center sm:justify-start lg:justify-center space-x-4">
                 <Icon icon="ic:baseline-facebook" className="h-5 sm:h-6 w-5 sm:w-6 text-blue-400 hover:text-blue-300 cursor-pointer transition-colors" />
                 <Icon icon="mdi:instagram" className="h-5 sm:h-6 w-5 sm:w-6 text-pink-400 hover:text-pink-300 cursor-pointer transition-colors" />
-                <Icon icon="ic:baseline-whatsapp" className="h-5 sm:h-6 w-5 sm:w-6 text-green-400 hover:text-green-300 cursor-pointer transition-colors" />
+                <Icon icon="ic:baseline-telegram" className="h-5 sm:h-6 w-5 sm:w-6 text-blue-400 hover:text-blue-300 cursor-pointer transition-colors" />
               </div>
             </div>
           </div>

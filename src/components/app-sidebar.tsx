@@ -47,12 +47,12 @@ const data = {
     //   icon: "ph:chat-circle-dots-bold",
     //   items: [],
     // },
-    {
-      title: "Pesanan",
-      url: "/admin/orders",
-      icon: "ph:shopping-cart-bold",
-      items: [],
-    },
+    // {
+    //   title: "Pesanan",
+    //   url: "/admin/orders",
+    //   icon: "ph:shopping-cart-bold",
+    //   items: [],
+    // },
   ],
   superAdminNav: [
     {
@@ -61,12 +61,12 @@ const data = {
       icon: "ph:users-bold",
       items: [],
     },
-    {
-      title: "Sistem",
-      url: "/admin/system",
-      icon: "ph:gear-bold", 
-      items: [],
-    },
+    // {
+    //   title: "Sistem",
+    //   url: "/admin/system",
+    //   icon: "ph:gear-bold", 
+    //   items: [],
+    // },
   ],
 };
 

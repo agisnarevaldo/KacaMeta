@@ -36,7 +36,6 @@ export default function ProductDetail() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [whatsappNumber, setWhatsappNumber] = useState<string>("6281234567890");
 
   // Helper function to get images array from images field
   const getImages = (images: string | null | undefined): string[] => {
@@ -74,11 +73,8 @@ export default function ProductDetail() {
     try {
       setLoading(true);
       
-      // Fetch product and WhatsApp config in parallel
-      const [productRes, whatsappRes] = await Promise.all([
-        fetch(`/api/products?slug=${slug}`),
-        fetch('/api/whatsapp-config')
-      ]);
+      // Fetch product data
+      const productRes = await fetch(`/api/products?slug=${slug}`);
       
       if (productRes.ok) {
         const data = await productRes.json();
@@ -91,11 +87,6 @@ export default function ProductDetail() {
         }
       } else {
         router.push('/');
-      }
-
-      if (whatsappRes.ok) {
-        const whatsappData = await whatsappRes.json();
-        setWhatsappNumber(whatsappData.whatsappNumber);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -111,9 +102,9 @@ export default function ProductDetail() {
     }
   }, [params.slug, fetchProduct]);
   
-  const sendWhatsApp = (productName: string) => {
+  const sendTelegram = (productName: string) => {
     const message = `Halo! Saya tertarik dengan ${productName}. Bisa info lebih lanjut?`;
-    const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+    const url = `https://t.me/KacaMeta_bot?start=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
 
@@ -306,14 +297,14 @@ export default function ProductDetail() {
             <div className="space-y-4">
               <Button 
                 size="lg"
-                className="w-full bg-green-600 hover:bg-green-700 text-white text-lg py-6"
-                onClick={() => sendWhatsApp(product.name)}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white text-lg py-6"
+                onClick={() => sendTelegram(product.name)}
                 disabled={product.status === 'OUT_OF_STOCK' || product.status === 'DISCONTINUED'}
               >
-                <Icon icon="ic:baseline-whatsapp" className="mr-3 h-6 w-6" />
+                <Icon icon="ic:baseline-telegram" className="mr-3 h-6 w-6" />
                 {product.status === 'OUT_OF_STOCK' || product.status === 'DISCONTINUED' 
                   ? 'Tidak Tersedia' 
-                  : 'Pesan via WhatsApp'
+                  : 'Pesan via Telegram'
                 }
               </Button>
               
@@ -331,7 +322,7 @@ export default function ProductDetail() {
         </div>
       </div>
 
-      {/* Bubble Chat WhatsApp - Only show if product is not available */}
+      {/* Bubble Chat Telegram - Only show if product is not available */}
       {(product.status === 'OUT_OF_STOCK' || product.status === 'DISCONTINUED') && (
         <div className="fixed bottom-6 right-6 z-40">
           <Button
@@ -339,7 +330,7 @@ export default function ProductDetail() {
             className="rounded-full h-14 w-14 bg-gray-400 cursor-not-allowed shadow-lg"
             disabled
           >
-            <Icon icon="ic:baseline-whatsapp" className="h-6 w-6 text-white" />
+            <Icon icon="ic:baseline-telegram" className="h-6 w-6 text-white" />
           </Button>
         </div>
       )}

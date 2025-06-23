@@ -144,7 +144,7 @@ export default function AdminDashboard() {
             {/* Performance Summary */}
             <div className="px-4 lg:px-6">
                   <div className="grid gap-4 md:grid-cols-3">
-                    <div className="flex items-center justify-between p-4 rounded-lg bg-green-50 hover:bg-green-100 transition-colors">
+                    {/* <div className="flex items-center justify-between p-4 rounded-lg bg-green-50 hover:bg-green-100 transition-colors">
                       <div className="flex items-center gap-3">
                         <div className="p-2 rounded-full bg-green-100">
                           <Icon icon="ph:shopping-cart-bold" className="h-4 w-4 text-green-600" />
@@ -160,7 +160,7 @@ export default function AdminDashboard() {
                           {stats?.orderGrowth ? `${parseFloat(stats.orderGrowth) > 0 ? '+' : ''}${stats.orderGrowth}%` : 'N/A'}
                         </p>
                       </div>
-                    </div>
+                    </div> */}
 
                     <div className="flex items-center justify-between p-4 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors">
                       <div className="flex items-center gap-3">
@@ -243,7 +243,7 @@ export default function AdminDashboard() {
                 </Card>
                 
                 {/* Orders Card */}
-                <Card className="hover:shadow-lg transition-all duration-200 group">
+                {/* <Card className="hover:shadow-lg transition-all duration-200 group">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total Pesanan</CardTitle>
                     <Icon icon="ph:shopping-cart-bold" className="h-4 w-4 text-muted-foreground" />
@@ -263,7 +263,7 @@ export default function AdminDashboard() {
                       Lihat Pesanan
                     </Button>
                   </CardContent>
-                </Card>
+                </Card> */}
                 
                 {/* Stock Overview Card */}
                 <Card className="hover:shadow-lg transition-all duration-200 group">

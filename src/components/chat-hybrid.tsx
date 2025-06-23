@@ -54,7 +54,7 @@ function ChatHybrid({
       }
       
       if (attempts >= maxCheckAttempts) {
-        console.log('❌ Botpress check timeout, showing WhatsApp fallback');
+        console.log('❌ Botpress check timeout, showing Telegram fallback');
         console.log('💡 You may need to add your bot configuration script from Botpress dashboard');
         setShowFallback(true);
         return false;
@@ -73,13 +73,12 @@ function ChatHybrid({
     };
   }, [botId, checkAttempts]);
 
-  const sendToWhatsApp = (message: string) => {
-    const adminPhone = process.env.NEXT_PUBLIC_ADMIN_PHONE_NUMBER || '6282228654835';
-    const url = `https://wa.me/${adminPhone}?text=${encodeURIComponent(message)}`;
+  const sendToTelegram = (message: string) => {
+    const url = `https://t.me/KacaMeta_bot?start=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
 
-  // Quick message options for WhatsApp fallback
+  // Quick message options for Telegram fallback
   const quickMessages = [
     'Halo! Saya ingin konsultasi kacamata 👓',
     'Berapa harga kacamata minus?',
@@ -91,7 +90,7 @@ function ChatHybrid({
 
   return (
     <>
-      {/* WhatsApp Fallback Chat Widget - Only show if Botpress fails */}
+      {/* Telegram Fallback Chat Widget - Only show if Botpress fails */}
       {showFallback && (
         <>
           {/* Chat Bubble Button */}
@@ -140,7 +139,7 @@ function ChatHybrid({
                 <div className="p-4 bg-slate-50 border-b">
                   <div className="flex items-center space-x-2 text-sm text-slate-600">
                     <div className="h-2 w-2 bg-yellow-500 rounded-full animate-pulse"></div>
-                    <span>Botpress sedang offline, gunakan WhatsApp</span>
+                    <span>Botpress sedang offline, gunakan Telegram</span>
                   </div>
                 </div>
 
@@ -158,7 +157,7 @@ function ChatHybrid({
                       size="sm"
                       className="w-full text-left justify-start text-sm h-auto py-3 px-4 hover:bg-blue-50 hover:border-blue-300 border-slate-200 transition-all duration-200"
                       onClick={() => {
-                        sendToWhatsApp(message);
+                        sendToTelegram(message);
                         setIsOpen(false);
                       }}
                     >
@@ -168,17 +167,17 @@ function ChatHybrid({
                   ))}
                 </div>
                 
-                {/* WhatsApp Action Button */}
+                {/* Telegram Action Button */}
                 <div className="p-4 border-t bg-slate-50">
                   <Button 
-                    className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-medium py-3 transition-all duration-200"
+                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium py-3 transition-all duration-200"
                     onClick={() => {
-                      sendToWhatsApp('Halo KacaMeta! Saya ingin konsultasi tentang kacamata. Mohon bantuan customer service untuk informasi produk dan layanan. Terima kasih! 😊');
+                      sendToTelegram('Halo KacaMeta! Saya ingin konsultasi tentang kacamata. Mohon bantuan customer service untuk informasi produk dan layanan. Terima kasih! 😊');
                       setIsOpen(false);
                     }}
                   >
-                    <Icon icon="ic:baseline-whatsapp" className="mr-2 h-5 w-5" />
-                    Chat Langsung via WhatsApp
+                    <Icon icon="ic:baseline-telegram" className="mr-2 h-5 w-5" />
+                    Chat Langsung via Telegram
                   </Button>
                   <p className="text-xs text-slate-500 mt-2 text-center">
                     Respon cepat dari tim customer service kami
